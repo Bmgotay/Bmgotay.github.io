@@ -366,8 +366,6 @@ SHELL = """<!DOCTYPE html>
         <li><a href="/the-feed/"__FEED_CURRENT__>Complete Feed</a></li>
         <li class="sub"><a href="/"__HOME_CURRENT__>SnatchTv Info</a></li>
         <li class="sub"><a href="/about-snatchnet/"__ABOUT_CURRENT__>About Barry</a></li>
-        <li><a href="/link-in-bio-with-flowery-wallpaper/">SnatchTv</a></li>
-        <li><a href="/snatchtv-news-stories-images/">News, Stories &amp; Images</a></li>
         <li><a href="/search/"__SEARCH_CURRENT__>Search</a></li>
       </ul>
     </nav>
@@ -457,6 +455,35 @@ def feed_item(post: dict, image: str | None) -> str:
     )
 
 
+def excerpt_text(post: dict, limit: int = 180) -> str:
+    text = plain(post.get("excerpt", {}).get("rendered") or "")
+    if len(text) < 12:
+        text = plain(post.get("content", {}).get("rendered") or "")
+    text = re.sub(r"\s+", " ", text).strip()
+    if not text:
+        return ""
+    if len(text) <= limit:
+        return text
+    cut = text[:limit].rsplit(" ", 1)[0].rstrip(".,;:—-")
+    return f"{cut}…"
+
+
+def home_feed_item(post: dict, image: str | None) -> str:
+    dt = parse_date(post["date"])
+    title = esc(post["title"]["rendered"])
+    href = post_path(post)
+    excerpt = excerpt_text(post)
+    excerpt_html = f'<p class="feed-excerpt">{esc(excerpt)}</p>' if excerpt else ""
+    thumb = f'<a href="{href}" tabindex="-1" aria-hidden="true"><img class="feed-thumb" src="{html.escape(image)}" alt=""></a>' if image else ""
+    klass = "feed-row" if image else "feed-row no-thumb"
+    return (
+        f'<li class="{klass}">'
+        f'<div class="feed-date"><time datetime="{dt.date().isoformat()}">{dt:%b} {dt.day}, {dt.year}</time></div>'
+        f'<div class="feed-copy"><h2 class="feed-title"><a href="{href}">{title}</a></h2>{excerpt_html}</div>'
+        f"{thumb}</li>"
+    )
+
+
 def grid_item(post: dict, image: str | None) -> str:
     href = post_path(post)
     title = esc(post["title"]["rendered"])
@@ -490,7 +517,7 @@ def download_one(url: str, dest: Path) -> tuple[str, str]:
     return url, last_error
 
 
-def main() -> None:
+def main(only: str | None = None) -> None:
     posts = load_collection("posts", f"{API}/posts?per_page=100&_embed=1")
     pages = load_collection("pages", f"{API}/pages?per_page=100&_embed=1")
     posts = [p for p in posts if p.get("status") == "publish"]
@@ -547,19 +574,27 @@ def main() -> None:
     def content_of(item: dict) -> str:
         return transform_html(item.get("content", {}).get("rendered", ""), featured_by_path)
 
-    # Home
+    # Home: landing copy, then every post newest-first.
     home_desc = plain(home["content"]["rendered"])
+    chrono = sorted(posts, key=lambda item: item["date"], reverse=True)
+    home_rows = "".join(home_feed_item(post, local_featured(post)) for post in chrono)
     write_page(
         "/",
         "SnatchTv Info",
         home_desc,
         f'<main id="content"><div class="narrow"><h1 class="post-title">{esc(home["title"]["rendered"])}</h1>'
-        f'<div class="entry-content">{content_of(home)}</div></div></main>',
+        f'<div class="entry-content">{content_of(home)}</div></div>'
+        f'<section class="home-feed wide" aria-label="All posts">'
+        f'<h2 class="home-feed-heading">The Feed</h2>'
+        f'<ul class="feed">{home_rows}</ul></section></main>',
         "home",
         "home",
         icon,
         social,
     )
+    if only == "home":
+        print("home feed posts", len(chrono))
+        return
 
     # About Barry
     about = by_slug_page["about-snatchnet"]
@@ -791,4 +826,5 @@ def main() -> None:
 
 
 if __name__ == "__main__":
-    main()
+    import sys
+    main(only="home" if "--home-only" in sys.argv else None)
