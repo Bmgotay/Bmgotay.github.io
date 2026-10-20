@@ -25,6 +25,8 @@ ROOT = Path(__file__).resolve().parents[1]
 API = "https://public-api.wordpress.com/wp/v2/sites/barrymgotay.wordpress.com"
 ORIGIN = "https://barrymgotay.wordpress.com"
 HOSTS = {"barrymgotay.wordpress.com"}
+X_PROFILE = "https://x.com/SnatchLiberty"
+X_LABEL = "Snatch Liberty (@SnatchLiberty)"
 CACHE = Path("/tmp/snatch")
 UA = "SnatchTv-static-mirror/1.0 (public archive; +https://bmgotay.github.io)"
 FEED_PAGE_SIZE = 8
@@ -141,6 +143,20 @@ def author_of(post: dict) -> tuple[str, str]:
     return "SnatchTvG", "bmgotay"
 
 
+def is_naani_profile(href: str) -> bool:
+    raw = html.unescape(href or "").strip()
+    if raw.startswith("//"):
+        raw = "https:" + raw
+    parsed = urlparse(raw)
+    host = parsed.netloc.lower().split(":")[0]
+    if host.startswith("www."):
+        host = host[4:]
+    if host not in {"twitter.com", "mobile.twitter.com", "x.com"}:
+        return False
+    parts = [part for part in unquote(parsed.path).split("/") if part]
+    return bool(parts) and parts[0].lower() == "naanimouse"
+
+
 def rewrite_href(href: str) -> str:
     if not href:
         return href
@@ -149,6 +165,8 @@ def rewrite_href(href: str) -> str:
         return raw
     if raw.startswith("//"):
         raw = "https:" + raw
+    if is_naani_profile(raw):
+        return X_PROFILE
     parsed = urlparse(raw)
     host = parsed.netloc.lower().split(":")[0]
     if host not in HOSTS and host != "":
@@ -319,7 +337,16 @@ def transform_html(source: str, featured_by_path: dict[str, str]) -> str:
             thumb.append(image)
 
     for anchor in soup.find_all("a", href=True):
+        was_naani = is_naani_profile(anchor["href"])
         anchor["href"] = rewrite_href(anchor["href"])
+        if was_naani:
+            label = anchor.find("span", class_="wp-block-social-link-label")
+            if label is not None:
+                classes = [name for name in (label.get("class") or []) if name != "screen-reader-text"]
+                label["class"] = classes or ["wp-block-social-link-label"]
+                label.string = X_LABEL
+            elif anchor.find("svg") is None:
+                anchor.string = X_LABEL
         if anchor["href"].startswith("http"):
             anchor["rel"] = "noopener noreferrer"
             if not anchor.get("target"):
@@ -598,12 +625,13 @@ def main(only: str | None = None) -> None:
 
     # About Barry
     about = by_slug_page["about-snatchnet"]
+    about_html = content_of(about)
     write_page(
         page_path(about),
         about["title"]["rendered"],
-        plain(about["content"]["rendered"]) or "About Barry Gotay Jr.",
+        plain(about_html) or "About Barry Gotay Jr.",
         f'<main id="content"><div class="narrow"><h1 class="post-title">{esc(about["title"]["rendered"])}</h1>'
-        f'<div class="entry-content">{content_of(about)}</div></div></main>',
+        f'<div class="entry-content">{about_html}</div></div></main>',
         "page",
         "about",
         icon,
@@ -811,11 +839,12 @@ def main(only: str | None = None) -> None:
         if page["slug"] == "the-feed":
             continue
         path = page_path(page)
+        page_text = plain(content_of(page) if page["slug"] == "about-snatchnet" else page["content"]["rendered"])
         index.append({
             "title": plain(page["title"]["rendered"]),
             "url": path,
             "dateLabel": "",
-            "text": plain(page["content"]["rendered"])[:800],
+            "text": page_text[:800],
             "terms": "page",
             "image": local_featured(page) or "",
         })
