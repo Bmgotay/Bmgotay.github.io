@@ -262,6 +262,22 @@ main { padding-bottom: 2rem; }
 
 .wp-block-social-links svg { width: 18px; height: 18px; fill: currentColor; }
 
+.wp-social-link-twitter a {
+  width: auto;
+  height: 36px;
+  padding: 0 0.9rem 0 0.55rem;
+  grid-auto-flow: column;
+  justify-content: start;
+  gap: 0.45rem;
+}
+
+.wp-social-link-twitter .wp-block-social-link-label {
+  font-size: var(--small);
+  font-weight: 700;
+  line-height: 1;
+  white-space: nowrap;
+}
+
 .screen-reader-text {
   position: absolute !important;
   width: 1px;
