@@ -185,6 +185,7 @@ def rewrite_href(href: str) -> str:
         "/about-snatchnet": "/about-snatchnet/",
         "/link-in-bio-with-flowery-wallpaper": "/link-in-bio-with-flowery-wallpaper/",
         "/snatchtv-news-stories-images": "/snatchtv-news-stories-images/",
+        "/free-stuff": "/free-stuff/",
     }
     if trimmed in routes:
         return routes[trimmed]
@@ -393,6 +394,10 @@ SHELL = """<!DOCTYPE html>
         <li><a href="/the-feed/"__FEED_CURRENT__>Complete Feed</a></li>
         <li class="sub"><a href="/"__HOME_CURRENT__>SnatchTv Info</a></li>
         <li class="sub"><a href="/about-snatchnet/"__ABOUT_CURRENT__>About Barry</a></li>
+        <li><a href="/category/snatchtv-original-content/"__ORIGINAL_CURRENT__>Original Content</a></li>
+        <li class="sub"><a href="/snatchtv-news-stories-images/"__NEWS_CURRENT__>News, Stories &amp; Images</a></li>
+        <li class="sub"><a href="/category/mens-support/"__MENS_CURRENT__>Men's Support Posts</a></li>
+        <li><a href="/free-stuff/"__FREE_CURRENT__>🎁 Free Stuff</a></li>
         <li><a href="/search/"__SEARCH_CURRENT__>Search</a></li>
       </ul>
     </nav>
@@ -419,6 +424,47 @@ def current(flag: bool) -> str:
     return ' aria-current="page"' if flag else ""
 
 
+def nav_flags(path: str) -> dict[str, str]:
+    def on(href: str, exact: bool = False) -> str:
+        hit = path == href if exact else path == href or path.startswith(href)
+        return current(hit)
+
+    return {
+        "__FEED_CURRENT__": on("/the-feed/"),
+        "__HOME_CURRENT__": on("/", exact=True),
+        "__ABOUT_CURRENT__": on("/about-snatchnet/"),
+        "__ORIGINAL_CURRENT__": on("/category/snatchtv-original-content/"),
+        "__NEWS_CURRENT__": on("/snatchtv-news-stories-images/"),
+        "__MENS_CURRENT__": on("/category/mens-support/"),
+        "__FREE_CURRENT__": on("/free-stuff/"),
+        "__SEARCH_CURRENT__": on("/search/"),
+    }
+
+
+FREE_STUFF_MAIN = """<main id="content" class="free-stuff">
+  <section class="free-banner" aria-labelledby="free-heading">
+    <h1 id="free-heading">🎁 Free Stuff from Snatch TV</h1>
+    <p>Tools, apps and goodies made by Snatch TV. 100% free, no catch. 🔥</p>
+  </section>
+  <article class="free-card">
+    <h2>🚨 #1: SHAME</h2>
+    <p class="free-kicker">Sabotage &amp; Hostility Analysis-Management Evaluator</p>
+    <figure class="free-shot">
+      <a href="https://shame-studio.ai.studio/" target="_blank" rel="noopener noreferrer"><img src="/images/shame-app-clean.png" alt="SHAME app evaluating a statement" width="1368" height="928"></a>
+    </figure>
+    <p class="free-lead">Ever wonder how something you said <strong>really</strong> came across? 🤔 Type in any statement and SHAME rates it instantly: how hostile it is, where the conversation is heading, and a calmer way to say it. 💬✨</p>
+    <ul>
+      <li>⚡ Instant rating from 1 to 5</li>
+      <li>📈 Shows if a conversation is escalating</li>
+      <li>🕊️ Suggests a better way to say it</li>
+      <li>🆓 Free, no sign-up needed</li>
+    </ul>
+    <p><a class="free-cta" href="https://shame-studio.ai.studio/" target="_blank" rel="noopener noreferrer">👉 Try SHAME Free</a></p>
+  </article>
+  <p class="free-soon">More free stuff coming soon. Stay tuned! 📺</p>
+</main>"""
+
+
 def write_page(rel: str, title: str, description: str, main: str, body_class: str, section: str, icon: str, social_image: str) -> None:
     path = "/" if rel in {"", "/"} else rel if rel.startswith("/") else "/" + rel
     if path != "/" and not path.endswith("/"):
@@ -433,11 +479,9 @@ def write_page(rel: str, title: str, description: str, main: str, body_class: st
         .replace("__ICON__", html.escape(icon))
         .replace("__BODY_CLASS__", html.escape(body_class, quote=True))
         .replace("__MAIN__", main)
-        .replace("__FEED_CURRENT__", current(section == "feed"))
-        .replace("__HOME_CURRENT__", current(section == "home"))
-        .replace("__ABOUT_CURRENT__", current(section == "about"))
-        .replace("__SEARCH_CURRENT__", current(section == "search"))
     )
+    for key, value in nav_flags(path).items():
+        html_doc = html_doc.replace(key, value)
     dest = ROOT / "index.html" if path == "/" else ROOT / path.strip("/") / "index.html"
     dest.parent.mkdir(parents=True, exist_ok=True)
     dest.write_text(html_doc)
@@ -793,6 +837,17 @@ def main(only: str | None = None) -> None:
         archive(data["posts"], f"/author/{slug}/", data["name"], f"Posts by {plain(data['name'])}.")
 
     write_page(
+        "/free-stuff/",
+        "Free Stuff from Snatch TV",
+        "Tools, apps and goodies made by Snatch TV. 100% free, no catch.",
+        FREE_STUFF_MAIN,
+        "page",
+        "free",
+        icon,
+        "/images/shame-app-clean.png",
+    )
+
+    write_page(
         "/search/",
         "Search",
         "Search SnatchTv posts and pages.",
@@ -836,7 +891,7 @@ def main(only: str | None = None) -> None:
             "image": local_featured(post) or "",
         })
     for page in pages:
-        if page["slug"] == "the-feed":
+        if page["slug"] in {"the-feed", "free-stuff"}:
             continue
         path = page_path(page)
         page_text = plain(content_of(page) if page["slug"] == "about-snatchnet" else page["content"]["rendered"])
@@ -848,6 +903,17 @@ def main(only: str | None = None) -> None:
             "terms": "page",
             "image": local_featured(page) or "",
         })
+    index.append({
+        "title": "Free Stuff from Snatch TV",
+        "url": "/free-stuff/",
+        "dateLabel": "",
+        "text": (
+            "Tools, apps and goodies made by Snatch TV. 100% free, no catch. "
+            "SHAME Sabotage and Hostility Analysis-Management Evaluator. Try SHAME Free."
+        ),
+        "terms": "page free stuff shame",
+        "image": "/images/shame-app-clean.png",
+    })
     (ROOT / "assets" / "search-index.json").write_text(json.dumps(index, ensure_ascii=False))
     (ROOT / ".nojekyll").write_text("")
     print("wrote", len(list(ROOT.rglob('index.html'))), "html files")
