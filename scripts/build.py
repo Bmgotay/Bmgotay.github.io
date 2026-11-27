@@ -407,7 +407,6 @@ SHELL = """<!DOCTYPE html>
   <footer class="site-footer">
     <div class="subscribe">
       <p>Email updates from the old WordPress.com form are not carried over. Write Barry directly.</p>
-      <a class="button" href="mailto:Bmgotay@gmail.com">Email Bmgotay@gmail.com</a>
     </div>
     <div class="footer-bar">
       <p class="footer-credit">Creator of SnatchTVG · <a href="https://twitter.com/SnatchLiberty" rel="me noopener noreferrer">@SnatchLiberty</a></p>
@@ -778,8 +777,7 @@ def main(only: str | None = None) -> None:
         comments = ""
         if post.get("comment_status") == "open":
             comments = (
-                '<p class="comments-note">Comments were open on WordPress.com and are not hosted on this archive. '
-                '<a href="mailto:Bmgotay@gmail.com">Email Barry</a>.</p>'
+                '<p class="comments-note">Comments were open on WordPress.com and are not hosted on this archive.</p>'
             )
         main = (
             f'<main id="content"><article class="narrow">'
